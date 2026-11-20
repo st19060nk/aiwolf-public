@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "aiwolf",
+  "version": "${version}",
+  "name": "AI Wolf Research",
+  "description": "Research mod: adaptive, experience-driven behaviour tendencies for tamed wolves (NAIST HAI Lab).",
+  "authors": [
+    "NAIST HAI Lab"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "jp.ac.naist.hai.aiwolf.AiWolfMod"
+    ]
+  },
+  "mixins": [
+    "aiwolf.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

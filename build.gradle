@@ -1,0 +1,175 @@
+plugins {
+    id 'fabric-loom' version '1.7-SNAPSHOT'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+// 開発環境のプレイヤー ID を固定する。
+//
+// Minecraft のクライアントは --username の既定値を "Player" + 起動時刻の下 3 桁 で
+// 生成するため、runClient のたびにユーザ名が変わり、そこから導かれるオフライン UUID も
+// 変わってしまう。すると前回テイムしたオオカミの飼い主が「別人」になり、
+// 飼い主に紐づく研究データが実行のたびに切れてしまう。
+// 本番では正規ログインなので起きないが、開発・動作確認では致命的なので固定する。
+loom {
+    runs {
+        client {
+            programArgs '--username', 'Researcher'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // Unit tests for the Minecraft-independent `core` layer.
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Phase 25A：実験に使ったコードの版を追跡できるよう、ビルド時に Git の commit を埋め込む。
+// 実行時に git を呼ぶ方式は、配布した jar や Git のない実験 PC で動かないので使わない。
+// Git 情報が取れないビルド（ソースの zip から作った等）では UNKNOWN と明示する（黙って省略しない）。
+def gitOutput = { List<String> command ->
+    try {
+        def result = providers.exec {
+            commandLine command
+            ignoreExitValue = true
+        }
+        return result.result.get().exitValue == 0 ? result.standardOutput.asText.get().trim() : null
+    } catch (Exception ignored) {
+        return null
+    }
+}
+
+def generatedBuildInfo = layout.buildDirectory.dir('generated/resources/buildinfo')
+
+tasks.register('generateBuildInfo') {
+    description = 'Writes aiwolf-build.properties (mod version and Git revision) for session metadata.'
+    def revision = gitOutput(['git', 'rev-parse', '--short=7', 'HEAD']) ?: 'UNKNOWN'
+    def status = revision == 'UNKNOWN' ? null : gitOutput(['git', 'status', '--porcelain', '--untracked-files=no'])
+    def dirty = status == null ? 'UNKNOWN' : (!status.isEmpty()).toString()
+    inputs.property 'modVersion', project.version.toString()
+    inputs.property 'buildRevision', revision
+    inputs.property 'buildDirty', dirty
+    outputs.dir generatedBuildInfo
+    doLast {
+        def file = generatedBuildInfo.get().file('aiwolf-build.properties').asFile
+        file.parentFile.mkdirs()
+        file.setText("""# Generated at build time by generateBuildInfo. Do not edit.
+modVersion=${project.version}
+buildRevision=${revision}
+buildDirty=${dirty}
+""", 'UTF-8')
+    }
+}
+
+sourceSets.main.resources.srcDir(generatedBuildInfo)
+tasks.named('processResources') { dependsOn 'generateBuildInfo' }
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn 'generateBuildInfo' }
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'loader_version', project.loader_version
+
+    filesMatching('fabric.mod.json') {
+        expand([
+                version          : project.version,
+                minecraft_version: project.minecraft_version,
+                loader_version   : project.loader_version
+        ])
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.encoding = 'UTF-8'
+    it.options.release = 21
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+}
+
+// 実験前シミュレーション。Minecraft を起動せずに行動分布の分離を検証する。
+//   ./gradlew simulate
+//   ./gradlew simulate -PsimArgs="--wolves=50 --events=120 --temperature=1.0"
+tasks.register('simulate', JavaExec) {
+    group = 'research'
+    description = 'Runs the pre-experiment simulation (no Minecraft required).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'jp.ac.naist.hai.aiwolf.simulation.PreExperimentSimulation'
+    if (project.hasProperty('simArgs')) {
+        args((project.simArgs as String).split('\\s+'))
+    }
+}
+
+// デモ撮影の効果量の見積もり（実験ノート docs/lab-notes/2026-11-14_demo-effect-size.md の再現用）。
+//   ./gradlew demoEstimate
+tasks.register('demoEstimate', JavaExec) {
+    group = 'research'
+    description = 'Estimates how much the demo experiences change behaviour probabilities (no Minecraft required).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'jp.ac.naist.hai.aiwolf.demo.DemoEffectSizeEstimate'
+    // Windows のコンソール既定（MS932）で日本語の表が化けないようにする。
+    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
+}
+
+// Phase 15：長期育成での内部状態の天井効果（研究パラメータは変えずに測る）。
+//   ./gradlew saturation
+//   ./gradlew saturation -PsatArgs="--seeds=10 --minutes=60"
+// 出力：research-output/state-saturation/
+tasks.register('saturation', JavaExec) {
+    group = 'research'
+    description = 'Measures how fast internal states saturate over long rearing (no Minecraft required).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'jp.ac.naist.hai.aiwolf.simulation.StateSaturationSimulation'
+    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
+    if (project.hasProperty('satArgs')) {
+        args((project.satArgs as String).split('\\s+'))
+    }
+}
+
+// Phase 17：アブレーション条件ごとの個体性評価（個体内・個体間距離と分離比）。
+//   ./gradlew individuality
+//   ./gradlew individuality -PindArgs="--seeds=10 --minutes=30"
+// 出力：research-output/individuality/
+tasks.register('individuality', JavaExec) {
+    group = 'research'
+    description = 'Evaluates behavioural individuality under each ablation condition (no Minecraft required).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'jp.ac.naist.hai.aiwolf.simulation.IndividualityEvaluation'
+    jvmArgs '-Dstdout.encoding=UTF-8', '-Dfile.encoding=UTF-8'
+    if (project.hasProperty('indArgs')) {
+        args((project.indArgs as String).split('\\s+'))
+    }
+}
+
+jar {
+    from('LICENSE') {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+}

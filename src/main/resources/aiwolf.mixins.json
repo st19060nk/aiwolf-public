@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "jp.ac.naist.hai.aiwolf.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "LivingEntityDamageMixin",
+    "MobEntityAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

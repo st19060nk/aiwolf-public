@@ -1,0 +1,12 @@
+@echo off
+rem 研究用 Minecraft サーバの起動スクリプト。
+rem サーバフォルダへ start.bat としてコピーし、以下の 2 行を環境に合わせて直すこと。
+
+set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot
+set LAUNCH_JAR=fabric-server-launch.jar
+
+rem -Xmx はサーバへ割り当てる最大メモリ。参加者 8 人程度なら 4G で足りる。
+"%JAVA_HOME%\bin\java.exe" -Xmx4G -Xms2G -jar "%LAUNCH_JAR%" nogui
+
+rem 異常終了したときにウィンドウを閉じずに残す
+pause

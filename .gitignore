@@ -1,0 +1,24 @@
+.gradle/
+build/
+out/
+run/
+*.class
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# 実験設定。experimentSalt は参加者の匿名 ID を決めるので、
+# 固定値を Git へ置かない（初回起動時にローカル生成される）。
+aiwolf.properties
+/config/
+/run/config/
+
+# Minecraft のロガーがテスト実行時に作る空ファイル
+/logs/
+
+# シミュレーションの生成物（再現コマンドで作り直せる。要約は docs/lab-notes に残す）
+/research-output/
+
+# Python のキャッシュ
+__pycache__/
