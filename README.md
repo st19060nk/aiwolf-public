@@ -5,6 +5,14 @@ Minecraft (Fabric) 用の研究 MOD。オオカミの行動傾向が **プレイ
 
 > **Personality is not stored. Personality is observed.**
 
+> [!NOTE]
+> このプロジェクトは**趣味として個人的に作っているもの**です。
+> 作りながら、ゆくゆくは研究（AI ペットの記憶を人が行動から感じ取れるか、など）にもつなげていきたいと考えています。
+> 研究計画や実験手順のドキュメントは検討中の内容を含み、確定したものではありません。
+>
+> *This is a hobby project that I hope to develop into research over time.
+> Planning documents in `docs/` are work in progress.*
+
 ---
 
 ## 1. 研究目的
